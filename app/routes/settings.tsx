@@ -27,7 +27,9 @@ export default function Settings() {
 			alert("数据库已重置成功");
 		} catch (error) {
 			console.error("重置数据库失败:", error);
-			alert(`重置数据库失败: ${error instanceof Error ? error.message : String(error)}`);
+			alert(
+				`重置数据库失败: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 

@@ -22,11 +22,11 @@ async function rtcCall() {
 	setCallStatus("loading");
 	resetCallDuration(); // 重置通话时间
 	const tools = useMCPStore.getState().realtimeTools;
+	const mcpClient = useMCPStore.getState().client;
 	console.log("request tools: ", tools);
 	const session = await openai.beta.realtime.sessions.create({
 		model: "gpt-4o-mini-realtime-preview",
 		instructions: "You are a helpful assistant",
-		tools,
 	});
 	const EPHEMERAL_KEY = session.client_secret.value;
 	const pc = new RTCPeerConnection();
@@ -62,8 +62,54 @@ async function rtcCall() {
 	setMS(ms);
 	pc.addTrack(ms.getTracks()[0]);
 	const dc = pc.createDataChannel("oai-events");
-	dc.onmessage = (e) => {
-		console.log("Data channel message:", JSON.parse(e.data));
+	dc.onmessage = async (e) => {
+		const data = JSON.parse(e.data);
+		//console.log("Data channel message:", data);
+		switch (data.type) {
+			case "response.done": {
+				const output = data.response.output[0]
+				if (output.type === "function_call") {
+					const name = output.name
+					const args = JSON.parse(output.arguments)
+					console.log("mcp call tool: ", name, args);
+					const result = await mcpClient?.callTool({
+						name,
+						arguments: args,
+					})
+					const content = JSON.stringify(result?.content)
+					dc.send(JSON.stringify({
+						type: "conversation.item.create",
+						item: {
+							type: "function_call_output",
+							call_id: output.call_id,
+							output: content
+						}
+					}));
+					dc.send(JSON.stringify({
+						type: "response.create",
+					}));
+				}
+				break;
+			}
+			default:
+				break;
+		}
+	};
+	dc.onopen = () => {
+		console.log("Data channel opened");
+		// update session
+		dc.send(
+			JSON.stringify({
+				type: "session.update",
+				session: {
+					tools,
+					tool_choice: "auto",
+					input_audio_transcription: {
+						model: "gpt-4o-mini-transcribe",
+					}
+				},
+			}),
+		);
 	};
 	const offer = await pc.createOffer();
 	await pc.setLocalDescription(offer);
