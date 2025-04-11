@@ -7,7 +7,7 @@ interface MCPSettings {
 	reset: () => void;
 }
 
-const DEFAULT_SSE_URL = "http://localhost:3000/sse";
+const DEFAULT_SSE_URL = "https://interview-mcp.fly.dev/sse";
 
 export const useMCPSettings = create<MCPSettings>()(
 	persist(
